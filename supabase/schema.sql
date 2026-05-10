@@ -9,6 +9,17 @@ create table if not exists projects (
   unique (user_id)
 );
 
+create table if not exists profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  full_name text,
+  email text,
+  phone text,
+  company text,
+  designation text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists phases (
   id text primary key,
   user_id uuid not null,
@@ -158,6 +169,7 @@ create table if not exists bank_reconcile_entries (
 );
 
 alter table projects enable row level security;
+alter table profiles enable row level security;
 alter table phases enable row level security;
 alter table timeline_entries enable row level security;
 alter table expenses enable row level security;
@@ -180,6 +192,8 @@ alter table bank_reconcile_entries enable row level security;
 
 drop policy if exists owner_full_access_projects on projects;
 create policy owner_full_access_projects on projects for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists owner_full_access_profiles on profiles;
+create policy owner_full_access_profiles on profiles for all using (auth.uid() = id) with check (auth.uid() = id);
 drop policy if exists owner_full_access_phases on phases;
 create policy owner_full_access_phases on phases for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 drop policy if exists owner_full_access_timeline_entries on timeline_entries;

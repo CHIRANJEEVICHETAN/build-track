@@ -139,6 +139,7 @@ function Sidebar({ current, setCurrent, collapsed, setCollapsed, isMobile, mobil
 
 function App() {
   const [session, setSession] = useState(null)
+  const [profile, setProfile] = useState(null)
   const [authReady, setAuthReady] = useState(!hasSupabaseConfig)
   const [current, setCurrent] = useState('dashboard')
   const [collapsed, setCollapsed] = useState(false)
@@ -150,6 +151,44 @@ function App() {
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
+
+  useEffect(() => {
+    if (!hasSupabaseConfig || !supabase || !session?.user?.id) {
+      setProfile(null)
+      return
+    }
+    let mounted = true
+    const loadProfile = async () => {
+      const fallbackProfile = {
+        full_name: session.user.user_metadata?.full_name || '',
+        phone: session.user.user_metadata?.phone || '',
+        company: session.user.user_metadata?.company || '',
+        designation: session.user.user_metadata?.designation || '',
+        email: session.user.email || '',
+      }
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name,phone,company,designation,email')
+        .eq('id', session.user.id)
+        .maybeSingle()
+      if (!mounted) return
+      if (data) setProfile(data)
+      else {
+        setProfile(fallbackProfile)
+        await supabase.from('profiles').upsert({
+          id: session.user.id,
+          full_name: fallbackProfile.full_name || null,
+          phone: fallbackProfile.phone || null,
+          company: fallbackProfile.company || null,
+          designation: fallbackProfile.designation || null,
+          email: fallbackProfile.email || null,
+          updated_at: new Date().toISOString(),
+        })
+      }
+    }
+    loadProfile()
+    return () => { mounted = false }
+  }, [session])
 
   useEffect(() => {
     if (!hasSupabaseConfig || !supabase) return
@@ -230,6 +269,19 @@ function App() {
             <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-3)' }}>
               {new Date().toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
             </div>
+            {session && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg-2)' }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(245,158,11,0.16)', color: '#F59E0B', fontWeight: 700, fontSize: 12, display: 'grid', placeItems: 'center' }}>
+                  {(profile?.full_name || session.user?.email || 'U').trim().charAt(0).toUpperCase()}
+                </div>
+                <div style={{ lineHeight: 1.1 }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)' }}>{profile?.full_name || 'User'}</p>
+                  <p style={{ fontSize: 10, color: 'var(--text-3)' }}>
+                    {profile?.designation || 'Member'}{profile?.company ? ` · ${profile.company}` : ''}
+                  </p>
+                </div>
+              </div>
+            )}
             {hasSupabaseConfig && session && (
               <button className="btn-secondary" style={{ padding: '6px 10px' }} onClick={() => supabase.auth.signOut()}>
                 Logout
