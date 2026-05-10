@@ -68,8 +68,13 @@ function genId(prefix, list, field = 'id') {
   return `${prefix}-${String(next).padStart(4, '0')}`
 }
 
-export function AppProvider({ children }) {
+export function AppProvider({ children, session }) {
   const saved = loadState()
+  const userId = session?.user?.id || null
+  const scopedId = useCallback((raw) => {
+    if (!userId) return String(raw)
+    return `${userId}:${raw}`
+  }, [userId])
 
   const [project, setProject] = useState(saved?.project || DEFAULT_PROJECT)
   const [phases, setPhases] = useState(saved?.phases || DEFAULT_PHASES)
@@ -185,39 +190,40 @@ export function AppProvider({ children }) {
   }, [snapshot])
 
   const migrateLegacyToSupabase = useCallback(async () => {
-    if (!hasSupabaseConfig || hasCompletedMigration()) return
+    if (!hasSupabaseConfig || hasCompletedMigration() || !userId) return
     const legacy = readLegacyState()
     if (!legacy) return
     exportCurrentLocalBackup()
     try {
-      await repos.projects.upsert([{ id: 'primary-project', payload: legacy.project || DEFAULT_PROJECT }], 'id')
+      await repos.projects.upsert([{ user_id: userId, payload: legacy.project || DEFAULT_PROJECT }], 'user_id')
       await repos.phases.upsert((legacy.phases || []).map(p => ({
-        id: p.id,
+        user_id: userId,
+        id: scopedId(p.id),
         name: p.name,
         priority: p.priority,
         planned_start: p.plannedStart || null,
         planned_end: p.plannedEnd || null,
       })), 'id')
-      await repos.timelineEntries.upsert((legacy.timeline || []).map(t => ({ phase: t.phase, payload: t })))
-      await repos.expenses.upsert((legacy.expenses || []).map(e => ({ id: e.id, payload: e })), 'id')
-      await repos.materials.upsert((legacy.materials || []).map(e => ({ id: e.id, payload: e })), 'id')
-      await repos.laborers.upsert((legacy.laborers || []).map(e => ({ id: e.id, payload: e })), 'id')
-      await repos.vendors.upsert((legacy.vendors || []).map(e => ({ id: e.id, payload: e })), 'id')
-      await repos.siteProgress.upsert((legacy.siteProgress || []).map(e => ({ id: e.id, payload: e })), 'id')
-      await repos.documents.upsert((legacy.documents || []).map(e => ({ id: e.id, payload: e })), 'id')
-      await repos.cashflow.upsert((legacy.cashFlow || []).map(e => ({ id: e.id, payload: e })), 'id')
+      await repos.timelineEntries.upsert((legacy.timeline || []).map(t => ({ user_id: userId, phase: t.phase, payload: t })))
+      await repos.expenses.upsert((legacy.expenses || []).map(e => ({ user_id: userId, id: scopedId(e.id), payload: e })), 'id')
+      await repos.materials.upsert((legacy.materials || []).map(e => ({ user_id: userId, id: scopedId(e.id), payload: e })), 'id')
+      await repos.laborers.upsert((legacy.laborers || []).map(e => ({ user_id: userId, id: scopedId(e.id), payload: e })), 'id')
+      await repos.vendors.upsert((legacy.vendors || []).map(e => ({ user_id: userId, id: scopedId(e.id), payload: e })), 'id')
+      await repos.siteProgress.upsert((legacy.siteProgress || []).map((e, i) => ({ user_id: userId, id: Number(e.id) || (Date.now() + i), payload: e })), 'id')
+      await repos.documents.upsert((legacy.documents || []).map((e, i) => ({ user_id: userId, id: Number(e.id) || (Date.now() + i), payload: e })), 'id')
+      await repos.cashflow.upsert((legacy.cashFlow || []).map((e, i) => ({ user_id: userId, id: Number(e.id) || (Date.now() + i), payload: e })), 'id')
       const customRows = Object.entries(legacy.customLists || {}).flatMap(([listKey, values]) =>
-        (values || []).map(v => ({ list_key: listKey, option_value: String(v || '').trim() })).filter(v => v.option_value),
+        (values || []).map(v => ({ user_id: userId, list_key: listKey, option_value: String(v || '').trim() })).filter(v => v.option_value),
       )
-      await repos.customLists.upsert(customRows, 'list_key,option_value')
+      await repos.customLists.upsert(customRows, 'user_id,list_key,option_value')
       markMigrationCompleted()
     } catch (error) {
       console.error('Legacy migration failed', error)
     }
-  }, [])
+  }, [userId, scopedId])
 
   const loadCloudData = useCallback(async () => {
-    if (!hasSupabaseConfig || !supabase) return
+    if (!hasSupabaseConfig || !supabase || !userId) return
     setLoadingCloud(true)
     try {
       const [
@@ -247,7 +253,7 @@ export function AppProvider({ children }) {
       ])
       if (prj[0]?.payload) setProject(prj[0].payload)
       if (phaseRows.length) setPhases(phaseRows.map(p => ({
-        id: p.id, name: p.name, priority: p.priority, plannedStart: p.planned_start || '', plannedEnd: p.planned_end || '',
+        id: String(p.id || '').split(':').pop(), name: p.name, priority: p.priority, plannedStart: p.planned_start || '', plannedEnd: p.planned_end || '',
       })))
       if (expRows.length) setExpenses(expRows.map(r => r.payload))
       if (matRows.length) setMaterials(matRows.map(r => r.payload))
@@ -278,7 +284,7 @@ export function AppProvider({ children }) {
     } finally {
       setLoadingCloud(false)
     }
-  }, [])
+  }, [userId])
 
   useEffect(() => {
     migrateLegacyToSupabase()
@@ -298,33 +304,33 @@ export function AppProvider({ children }) {
   }, [loadCloudData])
 
   useEffect(() => {
-    if (!hasSupabaseConfig) return
+    if (!hasSupabaseConfig || !userId) return
     const debounce = setTimeout(async () => {
       try {
-        await repos.projects.upsert([{ id: 'primary-project', payload: project }], 'id')
-        await repos.expenses.upsert(expenses.map(e => ({ id: e.id, payload: e })), 'id')
-        await repos.materials.upsert(materials.map(e => ({ id: e.id, payload: e })), 'id')
-        await repos.laborers.upsert(laborers.map(e => ({ id: e.id, payload: e })), 'id')
-        await repos.vendors.upsert(vendors.map(e => ({ id: e.id, payload: e })), 'id')
-        await repos.timelineEntries.upsert(timeline.map(t => ({ phase: t.phase, payload: t })))
-        await repos.siteProgress.upsert(siteProgress.map(s => ({ id: s.id, payload: s })), 'id')
-        await repos.documents.upsert(documents.map(d => ({ id: d.id, payload: d, file_path: d.filePath || null })), 'id')
-        await repos.cashflow.upsert(cashFlow.map(c => ({ id: c.id, payload: c })), 'id')
-        await repos.reminders.upsert(reminders.map(r => ({ id: r.id, payload: r })), 'id')
-        await repos.auditEvents.upsert(auditEvents.map(a => ({ id: a.id, payload: a })), 'id')
-        await repos.boqItems.upsert(boqItems.map(r => ({ id: r.id, payload: r })), 'id')
-        await repos.purchaseOrders.upsert(purchaseOrders.map(r => ({ id: r.id, payload: r })), 'id')
-        await repos.runningBills.upsert(runningBills.map(r => ({ id: r.id, payload: r })), 'id')
-        await repos.changeOrders.upsert(changeOrders.map(r => ({ id: r.id, payload: r })), 'id')
-        await repos.snagItems.upsert(snagItems.map(r => ({ id: r.id, payload: r })), 'id')
-        await repos.paymentEvents.upsert(paymentEvents.map(r => ({ id: r.id, payload: r })), 'id')
-        await repos.reconciliationEntries.upsert(reconciliationEntries.map(r => ({ id: r.id, payload: r })), 'id')
+        await repos.projects.upsert([{ user_id: userId, payload: project }], 'user_id')
+        await repos.expenses.upsert(expenses.map(e => ({ user_id: userId, id: scopedId(e.id), payload: e })), 'id')
+        await repos.materials.upsert(materials.map(e => ({ user_id: userId, id: scopedId(e.id), payload: e })), 'id')
+        await repos.laborers.upsert(laborers.map(e => ({ user_id: userId, id: scopedId(e.id), payload: e })), 'id')
+        await repos.vendors.upsert(vendors.map(e => ({ user_id: userId, id: scopedId(e.id), payload: e })), 'id')
+        await repos.timelineEntries.upsert(timeline.map(t => ({ user_id: userId, phase: t.phase, payload: t })))
+        await repos.siteProgress.upsert(siteProgress.map(s => ({ user_id: userId, id: Number(s.id) || Date.now(), payload: s })), 'id')
+        await repos.documents.upsert(documents.map(d => ({ user_id: userId, id: Number(d.id) || Date.now(), payload: d, file_path: d.filePath || null })), 'id')
+        await repos.cashflow.upsert(cashFlow.map(c => ({ user_id: userId, id: Number(c.id) || Date.now(), payload: c })), 'id')
+        await repos.reminders.upsert(reminders.map(r => ({ user_id: userId, id: r.id, payload: r })), 'id')
+        await repos.auditEvents.upsert(auditEvents.map(a => ({ user_id: userId, id: a.id, payload: a })), 'id')
+        await repos.boqItems.upsert(boqItems.map(r => ({ user_id: userId, id: r.id, payload: r })), 'id')
+        await repos.purchaseOrders.upsert(purchaseOrders.map(r => ({ user_id: userId, id: r.id, payload: r })), 'id')
+        await repos.runningBills.upsert(runningBills.map(r => ({ user_id: userId, id: r.id, payload: r })), 'id')
+        await repos.changeOrders.upsert(changeOrders.map(r => ({ user_id: userId, id: r.id, payload: r })), 'id')
+        await repos.snagItems.upsert(snagItems.map(r => ({ user_id: userId, id: r.id, payload: r })), 'id')
+        await repos.paymentEvents.upsert(paymentEvents.map(r => ({ user_id: userId, id: r.id, payload: r })), 'id')
+        await repos.reconciliationEntries.upsert(reconciliationEntries.map(r => ({ user_id: userId, id: r.id, payload: r })), 'id')
       } catch (error) {
         console.error('Cloud sync failed', error)
       }
     }, 450)
     return () => clearTimeout(debounce)
-  }, [
+  }, [userId, scopedId,
     project, expenses, materials, laborers, vendors, timeline, siteProgress, documents, cashFlow,
     reminders, auditEvents, boqItems, purchaseOrders, runningBills, changeOrders, snagItems,
     paymentEvents, reconciliationEntries,
@@ -427,6 +433,7 @@ export function AppProvider({ children }) {
     reconciliationEntries, addReconciliationEntry, deleteReconciliationEntry,
     timelineDependencyImpact,
     hasSupabaseConfig, loadingCloud,
+    userId,
     // stats
     totalSpent, totalPending, materialCost, laborCost,
     completionPct, completedPhases, budgetUsed,

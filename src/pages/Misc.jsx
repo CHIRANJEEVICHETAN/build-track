@@ -7,7 +7,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line
 } from 'recharts'
-import { uploadDocumentFile, deleteDocumentFile } from '../lib/storage/documents'
+import { uploadDocumentFile, deleteDocumentFile, getDocumentSignedUrl } from '../lib/storage/documents'
 
 // ─── SITE PROGRESS ─────────────────────────────────────────────────────────
 
@@ -91,6 +91,17 @@ const DOC_TYPES = ['Invoice','Receipt','Approval','Drawing','Warranty','Contract
 const emptyDoc = { type: '', fileName: '', date: '', vendor: '', remarks: '', filePath: '', fileUrl: '' }
 
 export function DocumentTracker() {
+  const openDocument = async (doc) => {
+    if (doc.fileUrl) {
+      window.open(doc.fileUrl, '_blank', 'noopener,noreferrer')
+      return
+    }
+    if (doc.filePath) {
+      const signed = await getDocumentSignedUrl(doc.filePath)
+      if (signed) window.open(signed, '_blank', 'noopener,noreferrer')
+    }
+  }
+
   const { documents, addDocument, deleteDocument, vendors, mergedDropdownOptions } = useApp()
   const docTypeOptions = mergedDropdownOptions(DROPDOWN_KEYS.docType, DOC_TYPES)
   const [showModal, setShowModal] = useState(false)
@@ -153,7 +164,9 @@ export function DocumentTracker() {
                 <tr key={d.id}>
                   <td><span className="badge badge-blue">{d.type}</span></td>
                   <td style={{ fontWeight: 600, color: '#3B82F6' }}>
-                    {d.fileUrl ? <a href={d.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#3B82F6' }}>{d.fileName}</a> : d.fileName}
+                    {(d.filePath || d.fileUrl)
+                      ? <button className="btn-secondary" style={{ padding: '4px 8px' }} onClick={() => openDocument(d)}>{d.fileName}</button>
+                      : d.fileName}
                   </td>
                   <td style={{ color: 'var(--text-2)', fontSize: 12 }}>{d.date}</td>
                   <td style={{ color: 'var(--text-2)', fontSize: 13 }}>{d.vendor}</td>

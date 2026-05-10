@@ -16,6 +16,8 @@ import ComplianceReports from './pages/ComplianceReports'
 import Reports from './pages/Reports'
 import SearchAndImport from './pages/SearchAndImport'
 import AuditTrail from './pages/AuditTrail'
+import AuthLanding from './pages/AuthLanding'
+import { hasSupabaseConfig, supabase } from './lib/supabaseClient'
 
 import {
   LayoutDashboard, Settings, Receipt, Package, Users, Building,
@@ -36,7 +38,7 @@ const PAGES = [
   { id: 'site', label: 'Site Progress', icon: Camera, component: SiteProgress },
   { id: 'documents', label: 'Documents', icon: FileText, component: DocumentTracker },
   { id: 'reminders', label: 'Reminders', icon: Bell, component: Reminders },
-  { id: 'workflows', label: 'Workflows', icon: ClipboardList, component: ConstructionWorkflows },
+  { id: 'workflows', label: 'Construction Processes', icon: ClipboardList, component: ConstructionWorkflows },
   { id: 'reconcile', label: 'Reconciliation', icon: ScrollText, component: PaymentReconciliation },
   { id: 'compliance', label: 'Compliance', icon: ShieldCheck, component: ComplianceReports },
   { id: 'reports', label: 'PDF Reports', icon: FileText, component: Reports },
@@ -136,6 +138,8 @@ function Sidebar({ current, setCurrent, collapsed, setCollapsed, isMobile, mobil
 }
 
 function App() {
+  const [session, setSession] = useState(null)
+  const [authReady, setAuthReady] = useState(!hasSupabaseConfig)
   const [current, setCurrent] = useState('dashboard')
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -147,13 +151,39 @@ function App() {
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
+  useEffect(() => {
+    if (!hasSupabaseConfig || !supabase) return
+    let mounted = true
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return
+      setSession(data.session || null)
+      setAuthReady(true)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession || null)
+      setAuthReady(true)
+    })
+    return () => {
+      mounted = false
+      sub.subscription.unsubscribe()
+    }
+  }, [])
+
   const page = PAGES.find(p => p.id === current)
   const PageComponent = page?.component
 
   const sidebarWidth = isMobile ? 0 : (collapsed ? 60 : 224)
 
+  if (!authReady) {
+    return <div className="bg-grid" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}><p>Loading...</p></div>
+  }
+
+  if (hasSupabaseConfig && !session) {
+    return <AuthLanding />
+  }
+
   return (
-    <AppProvider>
+    <AppProvider session={session}>
       <div className="bg-grid" style={{ minHeight: '100vh' }}>
         {/* Mobile overlay */}
         {mobileOpen && (
@@ -200,6 +230,11 @@ function App() {
             <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-3)' }}>
               {new Date().toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
             </div>
+            {hasSupabaseConfig && session && (
+              <button className="btn-secondary" style={{ padding: '6px 10px' }} onClick={() => supabase.auth.signOut()}>
+                Logout
+              </button>
+            )}
           </div>
 
           {/* Content */}
