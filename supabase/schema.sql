@@ -52,6 +52,13 @@ create table if not exists materials (
   created_at timestamptz not null default now()
 );
 
+create table if not exists other_debts (
+  id text primary key,
+  user_id uuid not null,
+  payload jsonb not null,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists laborers (
   id text primary key,
   user_id uuid not null,
@@ -174,6 +181,7 @@ alter table phases enable row level security;
 alter table timeline_entries enable row level security;
 alter table expenses enable row level security;
 alter table materials enable row level security;
+alter table other_debts enable row level security;
 alter table laborers enable row level security;
 alter table vendors enable row level security;
 alter table site_progress enable row level security;
@@ -202,6 +210,8 @@ drop policy if exists owner_full_access_expenses on expenses;
 create policy owner_full_access_expenses on expenses for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 drop policy if exists owner_full_access_materials on materials;
 create policy owner_full_access_materials on materials for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists owner_full_access_other_debts on other_debts;
+create policy owner_full_access_other_debts on other_debts for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 drop policy if exists owner_full_access_laborers on laborers;
 create policy owner_full_access_laborers on laborers for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 drop policy if exists owner_full_access_vendors on vendors;

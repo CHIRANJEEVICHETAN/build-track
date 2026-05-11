@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import { SectionHeader, StatusBadge, Modal, FormGrid, FormField, Input, Select, EmptyState, formatINR, formatINRFull } from '../components/ui'
+import VendorPicker from '../components/VendorPicker'
 import { DROPDOWN_KEYS } from '../constants/dropdownKeys'
 import { validateOrThrow, expenseSchema } from '../lib/validation/schemas'
 import { Plus, Trash2, Filter, Receipt, Download } from 'lucide-react'
@@ -163,8 +164,8 @@ export default function DailyExpenses() {
             <FormField label="Description" full>
               <Input value={form.description} onChange={e => f('description', e.target.value)} placeholder="What was purchased/paid for?" />
             </FormField>
-            <FormField label="Vendor / Supplier">
-              <Input value={form.vendor} onChange={e => f('vendor', e.target.value)} placeholder="Vendor name" />
+            <FormField label="Vendor / Supplier" full>
+              <VendorPicker value={form.vendor} onChange={e => f('vendor', e.target.value)} />
             </FormField>
             <FormField label="Status">
               <Select persistKey={DROPDOWN_KEYS.expenseStatus} options={STATUSES} value={form.status} onChange={e => f('status', e.target.value)} />

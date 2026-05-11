@@ -19,7 +19,7 @@ const expenseMapping = {
 }
 
 export default function SearchAndImport() {
-  const { expenses, materials, vendors, laborers, addExpense } = useApp()
+  const { expenses, materials, otherDebts, vendors, laborers, addExpense } = useApp()
   const [query, setQuery] = useState('')
   const [previewRows, setPreviewRows] = useState([])
 
@@ -29,11 +29,12 @@ export default function SearchAndImport() {
     const all = [
       ...expenses.map(e => ({ type: 'Expense', text: `${e.id} ${e.description} ${e.vendor}` })),
       ...materials.map(m => ({ type: 'Material', text: `${m.id} ${m.name} ${m.vendor}` })),
+      ...otherDebts.map(d => ({ type: 'Other debt', text: `${d.id} ${d.title} ${d.creditorName || ''}` })),
       ...vendors.map(v => ({ type: 'Vendor', text: `${v.id} ${v.name} ${v.workType}` })),
       ...laborers.map(l => ({ type: 'Labor', text: `${l.id} ${l.name} ${l.role}` })),
     ]
     return all.filter(x => x.text.toLowerCase().includes(q)).slice(0, 60)
-  }, [query, expenses, materials, vendors, laborers])
+  }, [query, expenses, materials, otherDebts, vendors, laborers])
 
   const onCsvFile = async (file) => {
     const text = await file.text()
@@ -59,9 +60,9 @@ export default function SearchAndImport() {
 
   return (
     <div>
-      <SectionHeader title="Search + CSV Import" sub="Global search and quick CSV import (expenses)." />
+      <SectionHeader title="Search + CSV Import" sub="Global search (expenses, materials, other debts, vendors, labor) and CSV import (expenses)." />
       <div className="card" style={{ padding: 16, marginBottom: 16 }}>
-        <Input placeholder="Search across expenses/materials/vendors/labor..." value={query} onChange={e => setQuery(e.target.value)} />
+        <Input placeholder="Search across expenses, materials, other debts, vendors, labor..." value={query} onChange={e => setQuery(e.target.value)} />
         <div style={{ marginTop: 12, display: 'grid', gap: 6 }}>
           {results.map((r, idx) => (
             <div key={idx} style={{ fontSize: 13, background: 'var(--bg-3)', borderRadius: 8, padding: '8px 10px' }}>

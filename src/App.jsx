@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { AppProvider } from './context/AppContext'
+import { NavigationProvider } from './context/NavigationContext'
 import Dashboard from './pages/Dashboard'
 import ProjectOverview from './pages/ProjectOverview'
 import DailyExpenses from './pages/DailyExpenses'
 import MaterialTracker from './pages/MaterialTracker'
+import OtherDebtTracker from './pages/OtherDebtTracker'
 import LaborTracker from './pages/LaborTracker'
 import VendorManagement from './pages/VendorManagement'
 import BudgetPlanning from './pages/BudgetPlanning'
@@ -22,7 +24,7 @@ import { hasSupabaseConfig, supabase } from './lib/supabaseClient'
 import {
   LayoutDashboard, Settings, Receipt, Package, Users, Building,
   PieChart, Calendar, Camera, FileText, TrendingUp, ChevronLeft,
-  ChevronRight, HardHat, Menu, X, Bell, ClipboardList, ShieldCheck, ScrollText, Search, History
+  ChevronRight, HardHat, Menu, X, Bell, ClipboardList, ShieldCheck, ScrollText, Search, History, Wallet
 } from 'lucide-react'
 
 const PAGES = [
@@ -30,6 +32,7 @@ const PAGES = [
   { id: 'project', label: 'Project Overview', icon: Settings, component: ProjectOverview },
   { id: 'expenses', label: 'Daily Expenses', icon: Receipt, component: DailyExpenses },
   { id: 'materials', label: 'Material Tracker', icon: Package, component: MaterialTracker },
+  { id: 'other-debts', label: 'Other debts', icon: Wallet, component: OtherDebtTracker },
   { id: 'labor', label: 'Labor Tracker', icon: Users, component: LaborTracker },
   { id: 'vendors', label: 'Vendor Management', icon: Building, component: VendorManagement },
   { id: 'budget', label: 'Budget Planning', icon: PieChart, component: BudgetPlanning },
@@ -211,6 +214,11 @@ function App() {
   const page = PAGES.find(p => p.id === current)
   const PageComponent = page?.component
 
+  const goToPage = useCallback((pageId) => {
+    setCurrent(pageId)
+    setMobileOpen(false)
+  }, [])
+
   const sidebarWidth = isMobile ? 0 : (collapsed ? 60 : 224)
 
   if (!authReady) {
@@ -223,6 +231,7 @@ function App() {
 
   return (
     <AppProvider session={session}>
+      <NavigationProvider goToPage={goToPage}>
       <div className="bg-grid" style={{ minHeight: '100vh' }}>
         {/* Mobile overlay */}
         {mobileOpen && (
@@ -231,7 +240,7 @@ function App() {
 
         <Sidebar
           current={current}
-          setCurrent={(id) => { setCurrent(id); setMobileOpen(false) }}
+          setCurrent={goToPage}
           collapsed={collapsed}
           setCollapsed={setCollapsed}
           isMobile={isMobile}
@@ -295,6 +304,7 @@ function App() {
           </div>
         </main>
       </div>
+      </NavigationProvider>
     </AppProvider>
   )
 }

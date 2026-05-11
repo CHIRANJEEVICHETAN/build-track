@@ -6,6 +6,7 @@ export const repos = {
   timelineEntries: createTableRepo('timeline_entries'),
   expenses: createTableRepo('expenses'),
   materials: createTableRepo('materials'),
+  otherDebts: createTableRepo('other_debts'),
   laborers: createTableRepo('laborers'),
   vendors: createTableRepo('vendors'),
   siteProgress: createTableRepo('site_progress'),

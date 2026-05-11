@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import { SectionHeader, Modal, FormGrid, FormField, Input, Select, EmptyState, formatINR, formatINRFull } from '../components/ui'
+import VendorPicker from '../components/VendorPicker'
 import { DROPDOWN_KEYS } from '../constants/dropdownKeys'
 import { Plus, Camera, FileText, TrendingUp, Edit2, Trash2 } from 'lucide-react'
 import {
@@ -102,7 +103,7 @@ export function DocumentTracker() {
     }
   }
 
-  const { documents, addDocument, deleteDocument, vendors, mergedDropdownOptions } = useApp()
+  const { documents, addDocument, deleteDocument, mergedDropdownOptions } = useApp()
   const docTypeOptions = mergedDropdownOptions(DROPDOWN_KEYS.docType, DOC_TYPES)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ ...emptyDoc })
@@ -198,7 +199,7 @@ export function DocumentTracker() {
               {uploading && <p style={{ marginTop: 8, fontSize: 12, color: 'var(--text-3)' }}>Uploading...</p>}
             </FormField>
             <FormField label="Date"><Input type="date" value={form.date} onChange={e => f('date', e.target.value)} /></FormField>
-            <FormField label="Related Vendor"><Input value={form.vendor} onChange={e => f('vendor', e.target.value)} placeholder="Vendor / Party name" /></FormField>
+            <FormField label="Related Vendor" full><VendorPicker value={form.vendor} onChange={e => f('vendor', e.target.value)} /></FormField>
             <FormField label="Remarks" full><Input value={form.remarks} onChange={e => f('remarks', e.target.value)} placeholder="Any notes..." /></FormField>
           </FormGrid>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>

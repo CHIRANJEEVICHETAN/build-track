@@ -3,6 +3,8 @@ import { supabase, hasSupabaseConfig } from '../lib/supabaseClient'
 import { repos } from '../lib/repositories'
 import { STORAGE_KEYS } from '../lib/storageKeys'
 import { exportCurrentLocalBackup, hasCompletedMigration, markMigrationCompleted, readLegacyState } from '../lib/sync/migration'
+import { computeMaterialDebtSnapshot } from '../utils/materialDebt'
+import { computeOtherDebtSnapshot } from '../utils/otherDebt'
 
 const AppContext = createContext(null)
 
@@ -80,6 +82,7 @@ export function AppProvider({ children, session }) {
   const [phases, setPhases] = useState(saved?.phases || DEFAULT_PHASES)
   const [expenses, setExpenses] = useState(saved?.expenses || [])
   const [materials, setMaterials] = useState(saved?.materials || [])
+  const [otherDebts, setOtherDebts] = useState(saved?.otherDebts || [])
   const [laborers, setLaborers] = useState(saved?.laborers || [])
   const [vendors, setVendors] = useState(saved?.vendors || [])
   const [timeline, setTimeline] = useState(saved?.timeline || DEFAULT_PHASES.map(p => ({
@@ -176,11 +179,11 @@ export function AppProvider({ children, session }) {
   const deleteReconciliationEntry = (id) => setReconciliationEntries(prev => prev.filter(r => r.id !== id))
 
   const snapshot = useMemo(() => ({
-    project, phases, expenses, materials, laborers, vendors, timeline, siteProgress,
+    project, phases, expenses, materials, otherDebts, laborers, vendors, timeline, siteProgress,
     documents, cashFlow, customLists, auditEvents, reminders, boqItems, purchaseOrders,
     runningBills, changeOrders, snagItems, paymentEvents, reconciliationEntries,
   }), [
-    project, phases, expenses, materials, laborers, vendors, timeline, siteProgress,
+    project, phases, expenses, materials, otherDebts, laborers, vendors, timeline, siteProgress,
     documents, cashFlow, customLists, auditEvents, reminders, boqItems, purchaseOrders,
     runningBills, changeOrders, snagItems, paymentEvents, reconciliationEntries,
   ])
@@ -207,6 +210,7 @@ export function AppProvider({ children, session }) {
       await repos.timelineEntries.upsert((legacy.timeline || []).map(t => ({ user_id: userId, phase: t.phase, payload: t })))
       await repos.expenses.upsert((legacy.expenses || []).map(e => ({ user_id: userId, id: scopedId(e.id), payload: e })), 'id')
       await repos.materials.upsert((legacy.materials || []).map(e => ({ user_id: userId, id: scopedId(e.id), payload: e })), 'id')
+      await repos.otherDebts.upsert((legacy.otherDebts || []).map(e => ({ user_id: userId, id: scopedId(e.id), payload: e })), 'id')
       await repos.laborers.upsert((legacy.laborers || []).map(e => ({ user_id: userId, id: scopedId(e.id), payload: e })), 'id')
       await repos.vendors.upsert((legacy.vendors || []).map(e => ({ user_id: userId, id: scopedId(e.id), payload: e })), 'id')
       await repos.siteProgress.upsert((legacy.siteProgress || []).map((e, i) => ({ user_id: userId, id: Number(e.id) || (Date.now() + i), payload: e })), 'id')
@@ -227,13 +231,14 @@ export function AppProvider({ children, session }) {
     setLoadingCloud(true)
     try {
       const [
-        prj, phaseRows, expRows, matRows, laborRows, vendorRows, tRows, siteRows, docRows, cfRows,
+        prj, phaseRows, expRows, matRows, odRows, laborRows, vendorRows, tRows, siteRows, docRows, cfRows,
         customRows, reminderRows, auditRows, boqRows, poRows, rbRows, coRows, snagRows, payRows, recRows,
       ] = await Promise.all([
         repos.projects.list(),
         repos.phases.list(),
         repos.expenses.list(),
         repos.materials.list(),
+        repos.otherDebts.list(),
         repos.laborers.list(),
         repos.vendors.list(),
         repos.timelineEntries.list(),
@@ -257,6 +262,7 @@ export function AppProvider({ children, session }) {
       })))
       if (expRows.length) setExpenses(expRows.map(r => r.payload))
       if (matRows.length) setMaterials(matRows.map(r => r.payload))
+      if (odRows.length) setOtherDebts(odRows.map(r => r.payload))
       if (laborRows.length) setLaborers(laborRows.map(r => r.payload))
       if (vendorRows.length) setVendors(vendorRows.map(r => r.payload))
       if (tRows.length) setTimeline(tRows.map(r => r.payload))
@@ -310,6 +316,7 @@ export function AppProvider({ children, session }) {
         await repos.projects.upsert([{ user_id: userId, payload: project }], 'user_id')
         await repos.expenses.upsert(expenses.map(e => ({ user_id: userId, id: scopedId(e.id), payload: e })), 'id')
         await repos.materials.upsert(materials.map(e => ({ user_id: userId, id: scopedId(e.id), payload: e })), 'id')
+        await repos.otherDebts.upsert(otherDebts.map(e => ({ user_id: userId, id: scopedId(e.id), payload: e })), 'id')
         await repos.laborers.upsert(laborers.map(e => ({ user_id: userId, id: scopedId(e.id), payload: e })), 'id')
         await repos.vendors.upsert(vendors.map(e => ({ user_id: userId, id: scopedId(e.id), payload: e })), 'id')
         await repos.timelineEntries.upsert(timeline.map(t => ({ user_id: userId, phase: t.phase, payload: t })))
@@ -331,7 +338,7 @@ export function AppProvider({ children, session }) {
     }, 450)
     return () => clearTimeout(debounce)
   }, [userId, scopedId,
-    project, expenses, materials, laborers, vendors, timeline, siteProgress, documents, cashFlow,
+    project, expenses, materials, otherDebts, laborers, vendors, timeline, siteProgress, documents, cashFlow,
     reminders, auditEvents, boqItems, purchaseOrders, runningBills, changeOrders, snagItems,
     paymentEvents, reconciliationEntries,
   ])
@@ -344,6 +351,14 @@ export function AppProvider({ children, session }) {
   const completedPhases = timeline.filter(t => t.status === 'Completed').length
   const completionPct = timeline.length ? Math.round((completedPhases / timeline.length) * 100) : 0
   const budgetUsed = project.plannedBudget ? Math.round((totalSpent / project.plannedBudget) * 100) : 0
+
+  const materialDebtTakenTotal = materials.reduce((s, m) => s + computeMaterialDebtSnapshot(m).taken, 0)
+  const materialDebtClearedTotal = materials.reduce((s, m) => s + computeMaterialDebtSnapshot(m).cleared, 0)
+  const materialDebtOutstandingTotal = materials.reduce((s, m) => s + computeMaterialDebtSnapshot(m).outstanding, 0)
+
+  const otherDebtTakenTotal = otherDebts.reduce((s, d) => s + computeOtherDebtSnapshot(d).taken, 0)
+  const otherDebtClearedTotal = otherDebts.reduce((s, d) => s + computeOtherDebtSnapshot(d).cleared, 0)
+  const otherDebtOutstandingTotal = otherDebts.reduce((s, d) => s + computeOtherDebtSnapshot(d).outstanding, 0)
 
   const addExpense = (data) => {
     const id = genId('EXP', expenses)
@@ -366,6 +381,13 @@ export function AppProvider({ children, session }) {
   }
   const updateMaterial = (id, data) => setMaterials(prev => prev.map(m => m.id === id ? { ...m, ...data } : m))
   const deleteMaterial = (id) => setMaterials(prev => prev.filter(m => m.id !== id))
+
+  const addOtherDebt = (data) => {
+    const id = genId('ODB', otherDebts)
+    setOtherDebts(prev => [{ ...data, id }, ...prev])
+  }
+  const updateOtherDebt = (id, data) => setOtherDebts(prev => prev.map(d => d.id === id ? { ...d, ...data } : d))
+  const deleteOtherDebt = (id) => setOtherDebts(prev => prev.filter(d => d.id !== id))
 
   const addLaborer = (data) => {
     const id = genId('WRK', laborers)
@@ -414,6 +436,7 @@ export function AppProvider({ children, session }) {
     phases, setPhases,
     expenses, addExpense, deleteExpense,
     materials, addMaterial, updateMaterial, deleteMaterial,
+    otherDebts, addOtherDebt, updateOtherDebt, deleteOtherDebt,
     laborers, addLaborer, updateLaborer, deleteLaborer,
     vendors, addVendor, updateVendor, deleteVendor,
     timeline, updateTimeline,
@@ -437,6 +460,8 @@ export function AppProvider({ children, session }) {
     // stats
     totalSpent, totalPending, materialCost, laborCost,
     completionPct, completedPhases, budgetUsed,
+    materialDebtTakenTotal, materialDebtClearedTotal, materialDebtOutstandingTotal,
+    otherDebtTakenTotal, otherDebtClearedTotal, otherDebtOutstandingTotal,
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

@@ -6,7 +6,7 @@ import {
 } from 'recharts'
 import {
   IndianRupee, TrendingUp, Clock, AlertTriangle, Package, Users,
-  CheckCircle, Activity, Zap, Building2
+  CheckCircle, Activity, Building2, Landmark, CircleDollarSign, Scale, Wallet, CreditCard
 } from 'lucide-react'
 
 const CHART_COLORS = ['#F59E0B', '#3B82F6', '#10B981', '#8B5CF6', '#EF4444', '#F97316', '#06B6D4', '#84CC16']
@@ -29,7 +29,9 @@ export default function Dashboard() {
   const {
     project, expenses, materials, vendors, laborers, timeline,
     totalSpent, totalPending, materialCost, laborCost,
-    completionPct, completedPhases, budgetUsed
+    completionPct, completedPhases, budgetUsed,
+    materialDebtTakenTotal, materialDebtClearedTotal, materialDebtOutstandingTotal,
+    otherDebtTakenTotal, otherDebtClearedTotal, otherDebtOutstandingTotal,
   } = useApp()
 
   const remaining = (project.plannedBudget || 0) - totalSpent
@@ -106,10 +108,16 @@ export default function Dashboard() {
         <KpiCard label="Total Spent" value={formatINR(totalSpent)} sub={`${budgetUsed}% of budget used`} icon={TrendingUp} color="#F59E0B" />
         <KpiCard label="Remaining" value={formatINR(remaining)} sub="Available budget" icon={Activity} color="#10B981" />
         <KpiCard label="Pending Payments" value={formatINR(totalPending)} sub={`${expenses.filter(e => e.status === 'Pending').length} transactions`} icon={Clock} color="#EF4444" />
+        <KpiCard label="Material debt taken" value={formatINR(materialDebtTakenTotal)} sub="Credit on material purchases" icon={Landmark} color="#A855F7" />
+        <KpiCard label="Material debt cleared" value={formatINR(materialDebtClearedTotal)} sub="Repaid toward material credit" icon={CircleDollarSign} color="#22C55E" />
+        <KpiCard label="Material debt outstanding" value={formatINR(materialDebtOutstandingTotal)} sub={materialDebtOutstandingTotal > 0 ? 'Still owed on materials' : 'No material credit balance'} icon={Scale} color={materialDebtOutstandingTotal > 0 ? '#EF4444' : '#10B981'} />
+        <KpiCard label="Other debt taken" value={formatINR(otherDebtTakenTotal)} sub="Non-material loans & credit" icon={Wallet} color="#6366F1" />
+        <KpiCard label="Other debt cleared" value={formatINR(otherDebtClearedTotal)} sub="Repaid on other debts" icon={CircleDollarSign} color="#22C55E" />
+        <KpiCard label="Other debt outstanding" value={formatINR(otherDebtOutstandingTotal)} sub={otherDebtOutstandingTotal > 0 ? 'Tracked on Other debts page' : 'No other debt balance'} icon={CreditCard} color={otherDebtOutstandingTotal > 0 ? '#EF4444' : '#10B981'} />
         <KpiCard label="Material Cost" value={formatINR(materialCost)} sub={`${catData.length} categories`} icon={Package} color="#8B5CF6" />
         <KpiCard label="Labor Cost" value={formatINR(laborCost)} sub={`${laborers.length} workers`} icon={Users} color="#F97316" />
         <KpiCard label="Completion" value={`${completionPct}%`} sub={`${completedPhases}/${timeline.length} phases`} icon={CheckCircle} color="#10B981" />
-        <KpiCard label="Alerts" value={overBudgetVendors.length + delayedPhases.length + lowStock.length} sub="Active issues" icon={AlertTriangle} color="#EF4444" />
+        <KpiCard label="Alerts" value={overBudgetVendors.length + delayedPhases.length + lowStock.length + (materialDebtOutstandingTotal > 0 ? 1 : 0) + (otherDebtOutstandingTotal > 0 ? 1 : 0) + (budgetUsed >= 80 ? 1 : 0)} sub="Active issues" icon={AlertTriangle} color="#EF4444" />
       </div>
 
       {/* Charts Row 1 */}
@@ -189,10 +197,16 @@ export default function Dashboard() {
             {lowStock.length > 0 && (
               <AlertItem color="#8B5CF6" title={`${lowStock.length} materials low stock`} sub={lowStock.slice(0, 2).map(m => m.name).join(', ')} />
             )}
+            {materialDebtOutstandingTotal > 0 && (
+              <AlertItem color="#A855F7" title="Material credit outstanding" sub={`${formatINRFull(materialDebtOutstandingTotal)} owed on tracked purchases`} />
+            )}
+            {otherDebtOutstandingTotal > 0 && (
+              <AlertItem color="#6366F1" title="Other debt outstanding" sub={`${formatINRFull(otherDebtOutstandingTotal)} — see Other debts page`} />
+            )}
             {budgetUsed >= 80 && (
               <AlertItem color="#EF4444" title={`Budget ${budgetUsed}% consumed`} sub="Review upcoming expenses" />
             )}
-            {overBudgetVendors.length === 0 && delayedPhases.length === 0 && lowStock.length === 0 && budgetUsed < 80 && (
+            {overBudgetVendors.length === 0 && delayedPhases.length === 0 && lowStock.length === 0 && materialDebtOutstandingTotal <= 0 && otherDebtOutstandingTotal <= 0 && budgetUsed < 80 && (
               <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-3)', fontSize: 13 }}>
                 <CheckCircle size={28} color="#10B981" style={{ margin: '0 auto 8px' }} />
                 <p>All clear — no active alerts</p>
