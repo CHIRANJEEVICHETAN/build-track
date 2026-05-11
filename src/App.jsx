@@ -258,19 +258,17 @@ function App() {
 
   useEffect(() => {
     if (!hasSupabaseConfig || !supabase) return
-    let mounted = true
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return
-      setSession(data.session || null)
+
+    // Single listener: Supabase emits INITIAL_SESSION from storage after init, then
+    // SIGNED_IN / TOKEN_REFRESHED / SIGNED_OUT. Avoid racing getSession() with StrictMode
+    // effect cleanup (which could unsubscribe before the initial event was delivered).
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession ?? null)
       setAuthReady(true)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession || null)
-      setAuthReady(true)
-    })
+
     return () => {
-      mounted = false
-      sub.subscription.unsubscribe()
+      subscription.unsubscribe()
     }
   }, [])
 
