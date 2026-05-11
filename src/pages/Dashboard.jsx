@@ -234,10 +234,10 @@ export default function Dashboard() {
       <div className="card" style={{ padding: 20 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', marginBottom: 16 }}>Phase Progress Overview</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
-          {timeline.map((t, i) => {
+          {timeline.filter((t, i, arr) => arr.findIndex(x => x.phase === t.phase) === i).map((t, i) => {
             const color = { Completed: '#10B981', 'In Progress': '#3B82F6', Delayed: '#EF4444', 'Not Started': '#374151' }[t.status] || '#374151'
             return (
-              <div key={i} style={{ background: 'var(--bg-3)', borderRadius: 8, padding: '10px 12px', borderLeft: `3px solid ${color}` }}>
+              <div key={t.phase} style={{ background: 'var(--bg-3)', borderRadius: 8, padding: '10px 12px', borderLeft: `3px solid ${color}` }}>
                 <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', marginBottom: 3 }}>{t.phase}</p>
                 <StatusBadge status={t.status} />
               </div>
