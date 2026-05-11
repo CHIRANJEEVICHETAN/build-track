@@ -17,6 +17,7 @@ import PaymentReconciliation from './pages/PaymentReconciliation'
 import ComplianceReports from './pages/ComplianceReports'
 import Reports from './pages/Reports'
 import SearchAndImport from './pages/SearchAndImport'
+import Analytics from './pages/Analytics'
 import AuditTrail from './pages/AuditTrail'
 import AuthLanding from './pages/AuthLanding'
 import { hasSupabaseConfig, supabase } from './lib/supabaseClient'
@@ -24,30 +25,66 @@ import { hasSupabaseConfig, supabase } from './lib/supabaseClient'
 import {
   LayoutDashboard, Settings, Receipt, Package, Users, Building,
   PieChart, Calendar, Camera, FileText, TrendingUp, ChevronLeft,
-  ChevronRight, HardHat, Menu, X, Bell, ClipboardList, ShieldCheck, ScrollText, Search, History, Wallet
+  ChevronRight, HardHat, Menu, X, Bell, ClipboardList, ShieldCheck,
+  ScrollText, Search, History, Wallet, BarChart3, IndianRupee,
+  Hammer, FolderOpen, FileBarChart
 } from 'lucide-react'
 
-const PAGES = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, component: Dashboard },
-  { id: 'project', label: 'Project Overview', icon: Settings, component: ProjectOverview },
-  { id: 'expenses', label: 'Daily Expenses', icon: Receipt, component: DailyExpenses },
-  { id: 'materials', label: 'Material Tracker', icon: Package, component: MaterialTracker },
-  { id: 'other-debts', label: 'Other debts', icon: Wallet, component: OtherDebtTracker },
-  { id: 'labor', label: 'Labor Tracker', icon: Users, component: LaborTracker },
-  { id: 'vendors', label: 'Vendor Management', icon: Building, component: VendorManagement },
-  { id: 'budget', label: 'Budget Planning', icon: PieChart, component: BudgetPlanning },
-  { id: 'cashflow', label: 'Cash Flow', icon: TrendingUp, component: CashFlow },
-  { id: 'timeline', label: 'Timeline Tracker', icon: Calendar, component: TimelineTracker },
-  { id: 'site', label: 'Site Progress', icon: Camera, component: SiteProgress },
-  { id: 'documents', label: 'Documents', icon: FileText, component: DocumentTracker },
-  { id: 'reminders', label: 'Reminders', icon: Bell, component: Reminders },
-  { id: 'workflows', label: 'Construction Processes', icon: ClipboardList, component: ConstructionWorkflows },
-  { id: 'reconcile', label: 'Reconciliation', icon: ScrollText, component: PaymentReconciliation },
-  { id: 'compliance', label: 'Compliance', icon: ShieldCheck, component: ComplianceReports },
-  { id: 'reports', label: 'PDF Reports', icon: FileText, component: Reports },
-  { id: 'search', label: 'Search & Import', icon: Search, component: SearchAndImport },
-  { id: 'audit', label: 'Audit Trail', icon: History, component: AuditTrail },
+const NAV_SECTIONS = [
+  {
+    label: 'Overview',
+    items: [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, component: Dashboard },
+      { id: 'analytics', label: 'Analytics', icon: BarChart3, component: Analytics },
+      { id: 'project', label: 'Project Overview', icon: Settings, component: ProjectOverview },
+    ],
+  },
+  {
+    label: 'Finance',
+    items: [
+      { id: 'expenses', label: 'Daily Expenses', icon: Receipt, component: DailyExpenses },
+      { id: 'budget', label: 'Budget Planning', icon: PieChart, component: BudgetPlanning },
+      { id: 'cashflow', label: 'Cash Flow', icon: TrendingUp, component: CashFlow },
+      { id: 'other-debts', label: 'Other Debts', icon: Wallet, component: OtherDebtTracker },
+    ],
+  },
+  {
+    label: 'Tracking',
+    items: [
+      { id: 'materials', label: 'Materials', icon: Package, component: MaterialTracker },
+      { id: 'labor', label: 'Labor', icon: Users, component: LaborTracker },
+      { id: 'vendors', label: 'Vendors', icon: Building, component: VendorManagement },
+      { id: 'timeline', label: 'Timeline', icon: Calendar, component: TimelineTracker },
+    ],
+  },
+  {
+    label: 'Site',
+    items: [
+      { id: 'site', label: 'Site Progress', icon: Camera, component: SiteProgress },
+      { id: 'documents', label: 'Documents', icon: FolderOpen, component: DocumentTracker },
+      { id: 'reminders', label: 'Reminders', icon: Bell, component: Reminders },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      { id: 'workflows', label: 'Workflows', icon: ClipboardList, component: ConstructionWorkflows },
+      { id: 'reconcile', label: 'Reconciliation', icon: ScrollText, component: PaymentReconciliation },
+      { id: 'compliance', label: 'Compliance', icon: ShieldCheck, component: ComplianceReports },
+    ],
+  },
+  {
+    label: 'Reports',
+    items: [
+      { id: 'reports', label: 'PDF Reports', icon: FileBarChart, component: Reports },
+      { id: 'search', label: 'Search & Import', icon: Search, component: SearchAndImport },
+      { id: 'audit', label: 'Audit Trail', icon: History, component: AuditTrail },
+    ],
+  },
 ]
+
+// Flat list for page lookup
+const PAGES = NAV_SECTIONS.flatMap(s => s.items)
 
 function Sidebar({ current, setCurrent, collapsed, setCollapsed, isMobile, mobileOpen, onCloseMobile }) {
   return (
@@ -110,23 +147,49 @@ function Sidebar({ current, setCurrent, collapsed, setCollapsed, isMobile, mobil
       </div>
 
       {/* Nav */}
-      <nav style={{ flex: 1, overflowY: 'auto', padding: '10px 8px' }}>
-        {PAGES.map(p => {
-          const Icon = p.icon
-          const active = current === p.id
-          return (
-            <button
-              key={p.id}
-              onClick={() => { setCurrent(p.id); if (isMobile) onCloseMobile?.() }}
-              className={`nav-item ${active ? 'active' : ''}`}
-              style={{ width: '100%', justifyContent: collapsed ? 'center' : 'flex-start', padding: collapsed ? '9px' : '9px 14px', border: active ? undefined : '1px solid transparent' }}
-              title={collapsed ? p.label : undefined}
-            >
-              <Icon size={16} />
-              {!collapsed && <span>{p.label}</span>}
-            </button>
-          )
-        })}
+      <nav style={{ flex: 1, overflowY: 'auto', padding: '6px 8px' }}>
+        {NAV_SECTIONS.map((section, si) => (
+          <div key={section.label} style={{ marginBottom: 4 }}>
+            {/* Section label */}
+            {!collapsed && (
+              <p style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: 'var(--text-3)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                padding: si === 0 ? '4px 14px 4px' : '10px 14px 4px',
+                marginBottom: 2,
+              }}>
+                {section.label}
+              </p>
+            )}
+            {collapsed && si > 0 && (
+              <div style={{ height: 1, background: 'var(--border)', margin: '6px 8px' }} />
+            )}
+            {section.items.map(p => {
+              const Icon = p.icon
+              const active = current === p.id
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => { setCurrent(p.id); if (isMobile) onCloseMobile?.() }}
+                  className={`nav-item ${active ? 'active' : ''}`}
+                  style={{
+                    width: '100%',
+                    justifyContent: collapsed ? 'center' : 'flex-start',
+                    padding: collapsed ? '7px' : '7px 14px',
+                    border: active ? undefined : '1px solid transparent',
+                  }}
+                  title={collapsed ? p.label : undefined}
+                >
+                  <Icon size={15} />
+                  {!collapsed && <span>{p.label}</span>}
+                </button>
+              )
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* Footer */}
