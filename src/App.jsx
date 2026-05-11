@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AppProvider } from './context/AppContext'
 import { NavigationProvider } from './context/NavigationContext'
 import Dashboard from './pages/Dashboard'
@@ -203,6 +203,24 @@ function Sidebar({ current, setCurrent, collapsed, setCollapsed, isMobile, mobil
   )
 }
 
+/** Merge profiles table row with auth metadata + email for top bar / UI */
+function buildDisplayProfile(session, profileRow) {
+  if (!session?.user) return null
+  const u = session.user
+  const meta = u.user_metadata || {}
+  const p = profileRow || {}
+  const email = String(p.email || u.email || '').trim()
+  const fullName = String(p.full_name || meta.full_name || '').trim()
+  const displayName = fullName || (email ? email.split('@')[0] : '') || email || 'Account'
+  const designation = String(p.designation || meta.designation || '').trim()
+  const company = String(p.company || meta.company || '').trim()
+  const phone = String(p.phone || meta.phone || '').trim()
+  const roleLine = [designation, company].filter(Boolean).join(' · ')
+  const subtitle = roleLine || email || phone || ''
+  const avatarSource = fullName || email || 'U'
+  return { displayName, subtitle, avatarLetter: avatarSource.charAt(0).toUpperCase(), email }
+}
+
 function App() {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -238,8 +256,15 @@ function App() {
         .eq('id', session.user.id)
         .maybeSingle()
       if (!mounted) return
-      if (data) setProfile(data)
-      else {
+      if (data) {
+        setProfile({
+          full_name: data.full_name || fallbackProfile.full_name || null,
+          phone: data.phone ?? fallbackProfile.phone ?? null,
+          company: data.company ?? fallbackProfile.company ?? null,
+          designation: data.designation ?? fallbackProfile.designation ?? null,
+          email: data.email || fallbackProfile.email || null,
+        })
+      } else {
         setProfile(fallbackProfile)
         await supabase.from('profiles').upsert({
           id: session.user.id,
@@ -281,6 +306,8 @@ function App() {
   }, [])
 
   const sidebarWidth = isMobile ? 0 : (collapsed ? 60 : 224)
+
+  const displayProfile = useMemo(() => buildDisplayProfile(session, profile), [session, profile])
 
   if (!authReady) {
     return <div className="bg-grid" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}><p>Loading...</p></div>
@@ -339,16 +366,20 @@ function App() {
             <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-3)' }}>
               {new Date().toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
             </div>
-            {session && (
+            {session && displayProfile && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg-2)' }}>
                 <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(245,158,11,0.16)', color: '#F59E0B', fontWeight: 700, fontSize: 12, display: 'grid', placeItems: 'center' }}>
-                  {(profile?.full_name || session.user?.email || 'U').trim().charAt(0).toUpperCase()}
+                  {displayProfile.avatarLetter}
                 </div>
-                <div style={{ lineHeight: 1.1 }}>
-                  <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)' }}>{profile?.full_name || 'User'}</p>
-                  <p style={{ fontSize: 10, color: 'var(--text-3)' }}>
-                    {profile?.designation || 'Member'}{profile?.company ? ` · ${profile.company}` : ''}
+                <div style={{ lineHeight: 1.1, minWidth: 0, maxWidth: 220 }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={displayProfile.displayName}>
+                    {displayProfile.displayName}
                   </p>
+                  {displayProfile.subtitle ? (
+                    <p style={{ fontSize: 10, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={displayProfile.subtitle}>
+                      {displayProfile.subtitle}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             )}
